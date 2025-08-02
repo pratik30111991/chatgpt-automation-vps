@@ -1,41 +1,38 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const puppeteer = require('puppeteer');
+const bodyParser = require('body-parser');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 
 app.post('/', async (req, res) => {
-  const prompt = req.body.prompt;
-  if (!prompt) return res.status(400).send('No prompt provided');
-
+  const prompt = req.body.prompt || "No prompt received";
   try {
     const browser = await puppeteer.launch({
       headless: "new",
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
     const page = await browser.newPage();
-    await page.goto('https://chat.openai.com', { waitUntil: 'load' });
+    await page.goto("https://chat.openai.com", { waitUntil: "load" });
 
-    // Wait for login only once (you need to login manually 1 time)
-    await page.waitForSelector('textarea');
-    await page.type('textarea', `"${prompt}" related blog title`);
-    await page.keyboard.press('Enter');
+    await page.waitForSelector("textarea");
+    await page.type("textarea", `"${prompt}" related blog title`);
+    await page.keyboard.press("Enter");
 
-    await page.waitForSelector('.markdown', { timeout: 60000 });
+    await page.waitForSelector(".markdown", { timeout: 60000 });
     const response = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('.markdown')).map(el => el.innerText).join('\n');
+      return Array.from(document.querySelectorAll(".markdown"))
+        .map(el => el.innerText)
+        .join("\n\n");
     });
 
     await browser.close();
-    res.send({ result: response });
+    res.json({ result: response });
   } catch (err) {
     console.error(err);
-    res.status(500).send('Automation error');
+    res.status(500).send("Automation error: " + err.message);
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
