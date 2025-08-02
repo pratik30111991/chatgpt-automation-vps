@@ -2,10 +2,7 @@ services:
   - type: web
     name: chatgpt-automation-vps
     env: python
-    buildCommand: |
-      pip install -r requirements.txt
-      playwright install chromium
-    startCommand: python main.py
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.10
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python main.py"
+    plan: free
+    envVars: []
