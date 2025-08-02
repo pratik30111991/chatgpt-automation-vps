@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from playwright.sync_api import sync_playwright
 import time
+import os
 
 app = Flask(__name__)
 
@@ -20,28 +21,21 @@ def chatgpt_automation():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         
-        # 1. Go to ChatGPT
-        page.goto("https://chat.openai.com/")
+        page.goto("https://chat.openai.com")
         time.sleep(5)
 
-        # 2. Login
-        page.click("text=Log in")
-        time.sleep(3)
-        page.fill("input[type='email']", "kimthy091@gmail.com")
-        page.click("button:has-text('Continue')")
-        time.sleep(3)
-        page.fill("input[type='password']", "Kes@riya99")
-        page.click("button:has-text('Continue')")
-        time.sleep(7)
-
-        # 3. Send Prompt
+        # Login (basic version, you can automate if needed)
+        # Replace these with your actual credentials if auto-login is set up
         page.fill("textarea", prompt)
         page.keyboard.press("Enter")
-        time.sleep(15)
+        time.sleep(10)
 
-        # 4. Get Response
-        content = page.locator(".markdown").last.inner_text()
-
+        response = page.locator(".markdown").last.inner_text()
         browser.close()
 
-    return jsonify({"response": content})
+    return jsonify({"response": response})
+
+# THIS PART IS MANDATORY ON RENDER:
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
