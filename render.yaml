@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: chatgpt-automation-vps
-    env: node
-    buildCommand: npm install
-    startCommand: npm start
-    plan: free
-    region: oregon
