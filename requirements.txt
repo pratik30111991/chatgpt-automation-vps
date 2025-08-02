@@ -1,2 +1,2 @@
-flask
-playwright
+Flask==2.2.5
+playwright==1.44.0
