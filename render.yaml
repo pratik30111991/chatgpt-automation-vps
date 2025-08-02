@@ -1,10 +1,8 @@
 services:
   - type: web
-    name: chatgpt-vps
-    env: python
-    buildCommand: ""
-    startCommand: gunicorn main:app -b 0.0.0.0:10000
+    name: chatgpt-automation-vps
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
     plan: free
-    autoDeploy: true
-    envVars: []
     region: oregon
