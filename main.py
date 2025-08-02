@@ -13,29 +13,27 @@ def home():
 def chatgpt_automation():
     data = request.get_json()
     prompt = data.get("prompt", "")
-    
+
     if not prompt:
         return jsonify({"error": "No prompt provided"}), 400
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        
-        page.goto("https://chat.openai.com")
-        time.sleep(5)
 
-        # Login (basic version, you can automate if needed)
-        # Replace these with your actual credentials if auto-login is set up
+        page.goto("https://chat.openai.com")
+        time.sleep(8)  # Give time to load
+
+        # You must manually log in at least once in the browser to keep session cookies
         page.fill("textarea", prompt)
         page.keyboard.press("Enter")
-        time.sleep(10)
+        time.sleep(12)  # Wait for ChatGPT to generate
 
         response = page.locator(".markdown").last.inner_text()
         browser.close()
 
     return jsonify({"response": response})
 
-# THIS PART IS MANDATORY ON RENDER:
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
