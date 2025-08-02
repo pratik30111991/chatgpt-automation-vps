@@ -1,10 +1,7 @@
 services:
   - type: web
     name: chatgpt-automation-vps
-    runtime: python
+    env: python
     buildCommand: ""
     startCommand: "python main.py"
-    envVars:
-      - key: ENV
-        value: production
-    autoDeploy: true
+    plan: free
