@@ -1,4 +1,6 @@
 flask
+flask-cors
 google-api-python-client
 google-auth
 pyppeteer
+g4f
