@@ -5,12 +5,10 @@ from g4f.client import Client
 app = Flask(__name__)
 CORS(app)
 
-# ✅ GET request support for browser visits
 @app.route("/", methods=["GET"])
 def home():
     return "✅ ChatGPT Automation VPS is running. Send a POST request to get blog titles."
 
-# ✅ Main POST route for Make.com, etc.
 @app.route("/", methods=["POST"])
 def generate_titles():
     try:
@@ -29,8 +27,6 @@ def generate_titles():
         )
 
         output = response.choices[0].message.content
-
-        # Extract list of titles (optional cleanup)
         titles = [line.strip("•-1234567890. ") for line in output.split("\n") if line.strip()]
         return jsonify({"titles": titles})
 
