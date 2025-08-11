@@ -3,6 +3,6 @@ services:
     name: chatgpt-automation-vps
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    startCommand: python main_clean.py
     plan: free
     autoDeploy: true
