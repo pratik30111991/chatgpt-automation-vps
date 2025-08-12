@@ -4,7 +4,6 @@ from flask_cors import CORS
 from g4f.client import Client
 import re, json, html, logging
 
-# Setup logging so Render can capture all logs
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
@@ -19,7 +18,6 @@ def clean_title(title: str) -> str:
 
     t = title.strip()
 
-    # Try JSON parse repeatedly to remove nested quotes
     for _ in range(3):
         try:
             parsed = json.loads(t)
@@ -30,21 +28,14 @@ def clean_title(title: str) -> str:
         except Exception:
             break
 
-    # Normalize whitespace
     t = re.sub(r'[\r\n\t]+', ' ', t)
     t = re.sub(r'\s{2,}', ' ', t)
 
-    # Remove all wrapping quotes (single/double) repeatedly
     while (t.startswith('"') and t.endswith('"')) or (t.startswith("'") and t.endswith("'")):
         t = t[1:-1].strip()
 
-    # Remove any trailing commas or stray quotes
     t = t.strip(", '\"")
-
-    # Unescape HTML entities
     t = html.unescape(t)
-
-    # Remove leftover control chars
     t = re.sub(r'[\x00-\x1f\x7f]+', '', t)
 
     return t.strip()
@@ -63,7 +54,7 @@ def handle():
             logging.warning("⚠️ Empty or invalid JSON received.")
             return jsonify({"error": "Invalid or empty JSON"}), 400
 
-        # CLEAN mode (titles already provided)
+        # If titles are already provided, just clean and return them
         if 'title' in data:
             titles = data['title']
             logging.info(f"📝 Raw titles from request: {titles}")
@@ -92,33 +83,55 @@ def handle():
             logging.info(f"✅ Cleaned titles: {cleaned}")
             return jsonify({"titles": cleaned}), 200
 
-        # GENERATE mode (use GPT to get titles)
+        # GENERATE mode
         keyword = data.get("keyword", "").strip()
         if not keyword:
             logging.error("❌ Missing keyword for generation.")
             return jsonify({"error": "Keyword is required when no title provided"}), 400
 
-        logging.info(f"🔍 Generating titles for keyword: {keyword}")
+        generate_content = data.get("generate_content", False)
 
-        prompt = f"Give me 5 unique blog titles on the topic: {keyword}. Return only titles in list format, no intro or explanation."
         client = Client()
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-        )
 
-        output = response.choices[0].message.content
-        raw_titles = [line.strip("•-1234567890. ") for line in output.split("\n") if line.strip()]
-        cleaned_titles = [clean_title(t) for t in raw_titles if t]
+        if generate_content:
+            # Generate long detailed content
+            prompt = (
+                f"Write a long, detailed blog article on the topic: {keyword}. "
+                "Make it comprehensive and informative."
+            )
+            logging.info(f"🔍 Generating long content for keyword: {keyword}")
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            content = response.choices[0].message.content
+            logging.info(f"🤖 Generated long content length: {len(content)} chars")
 
-        logging.info(f"🤖 GPT raw output: {output}")
-        logging.info(f"✅ Cleaned generated titles: {cleaned_titles}")
+            return jsonify({"content": content}), 200
 
-        return jsonify({"titles": cleaned_titles}), 200
+        else:
+            # Generate 5 unique blog titles
+            prompt = f"Give me 5 unique blog titles on the topic: {keyword}. Return only titles in list format, no intro or explanation."
+            logging.info(f"🔍 Generating titles for keyword: {keyword}")
+
+            response = client.chat.completions.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+            )
+
+            output = response.choices[0].message.content
+            raw_titles = [line.strip("•-1234567890. ") for line in output.split("\n") if line.strip()]
+            cleaned_titles = [clean_title(t) for t in raw_titles if t]
+
+            logging.info(f"🤖 GPT raw output: {output}")
+            logging.info(f"✅ Cleaned generated titles: {cleaned_titles}")
+
+            return jsonify({"titles": cleaned_titles}), 200
 
     except Exception as e:
         logging.exception("💥 Server error occurred")
         return jsonify({"error": "Server error", "details": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
