@@ -13,21 +13,27 @@ def clean_title(title: str) -> str:
 
     t = title.strip()
 
-    # --- NEW: Try to parse JSON string to remove wrapping quotes ---
-    try:
-        parsed = json.loads(t)
-        if isinstance(parsed, str):
-            t = parsed.strip()
-    except Exception:
-        pass
+    # Try JSON parse repeatedly to remove nested quotes
+    for _ in range(3):
+        try:
+            parsed = json.loads(t)
+            if isinstance(parsed, str):
+                t = parsed.strip()
+            else:
+                break
+        except Exception:
+            break
 
     # Normalize whitespace
     t = re.sub(r'[\r\n\t]+', ' ', t)
     t = re.sub(r'\s{2,}', ' ', t)
 
-    # Remove wrapping quotes if still present
-    if (t.startswith('"') and t.endswith('"')) or (t.startswith("'") and t.endswith("'")):
-        t = t[1:-1]
+    # Remove all wrapping quotes (single/double) repeatedly
+    while (t.startswith('"') and t.endswith('"')) or (t.startswith("'") and t.endswith("'")):
+        t = t[1:-1].strip()
+
+    # Remove any trailing commas or stray quotes
+    t = t.strip(", '\"")
 
     # Unescape HTML entities
     t = html.unescape(t)
@@ -35,7 +41,6 @@ def clean_title(title: str) -> str:
     # Remove leftover control chars
     t = re.sub(r'[\x00-\x1f\x7f]+', '', t)
 
-    # Trim again
     return t.strip()
 
 @app.route("/", methods=["GET"])
