@@ -10,13 +10,32 @@ CORS(app)
 def clean_title(title: str) -> str:
     if not isinstance(title, str):
         return ""
+
     t = title.strip()
+
+    # --- NEW: Try to parse JSON string to remove wrapping quotes ---
+    try:
+        parsed = json.loads(t)
+        if isinstance(parsed, str):
+            t = parsed.strip()
+    except Exception:
+        pass
+
+    # Normalize whitespace
     t = re.sub(r'[\r\n\t]+', ' ', t)
     t = re.sub(r'\s{2,}', ' ', t)
+
+    # Remove wrapping quotes if still present
     if (t.startswith('"') and t.endswith('"')) or (t.startswith("'") and t.endswith("'")):
         t = t[1:-1]
+
+    # Unescape HTML entities
     t = html.unescape(t)
+
+    # Remove leftover control chars
     t = re.sub(r'[\x00-\x1f\x7f]+', '', t)
+
+    # Trim again
     return t.strip()
 
 @app.route("/", methods=["GET"])
@@ -30,21 +49,24 @@ def handle():
         if not data:
             return jsonify({"error": "Invalid or empty JSON"}), 400
 
-        # CLEAN MODE
+        # CLEAN mode (Make.com will call this)
         if 'title' in data:
             titles = data['title']
             if isinstance(titles, str):
                 titles_str = titles.strip()
+                # Try parse as JSON array
                 try:
                     parsed = json.loads(titles_str)
                     if isinstance(parsed, list):
                         titles = parsed
+                    elif isinstance(parsed, str):
+                        titles = [parsed]
                 except Exception:
+                    # Fallback split
                     if '\n' in titles_str:
                         titles = [s.strip() for s in titles_str.split('\n') if s.strip()]
                     elif '","' in titles_str:
-                        parts = [p.strip().strip('"').strip() for p in titles_str.split('","') if p.strip()]
-                        titles = parts if parts else [titles_str]
+                        titles = [p.strip().strip('"').strip() for p in titles_str.split('","') if p.strip()]
                     else:
                         titles = [titles_str]
 
@@ -53,12 +75,9 @@ def handle():
             else:
                 cleaned = [clean_title(str(titles))] if titles else []
 
-            # 🚀 Always return as plain string (no array, no quotes)
-            if cleaned:
-                return cleaned[0], 200
-            return "", 200
+            return jsonify({"titles": cleaned}), 200
 
-        # GENERATE MODE
+        # GENERATE mode (old behavior)
         keyword = data.get("keyword", "").strip()
         if not keyword:
             return jsonify({"error": "Keyword is required when no title provided"}), 400
@@ -72,7 +91,7 @@ def handle():
         output = response.choices[0].message.content
         raw_titles = [line.strip("•-1234567890. ") for line in output.split("\n") if line.strip()]
         cleaned_titles = [clean_title(t) for t in raw_titles if t]
-        return "\n".join(cleaned_titles), 200
+        return jsonify({"titles": cleaned_titles}), 200
 
     except Exception as e:
         return jsonify({"error": "Server error", "details": str(e)}), 500
