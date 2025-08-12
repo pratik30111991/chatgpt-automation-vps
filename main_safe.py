@@ -10,32 +10,13 @@ CORS(app)
 def clean_title(title: str) -> str:
     if not isinstance(title, str):
         return ""
-    # Normalize whitespace
     t = title.strip()
     t = re.sub(r'[\r\n\t]+', ' ', t)
     t = re.sub(r'\s{2,}', ' ', t)
-
-    # Remove wrapping quotes if present
     if (t.startswith('"') and t.endswith('"')) or (t.startswith("'") and t.endswith("'")):
         t = t[1:-1]
-
-    # Unescape escaped quotes \" -> "
-    t = t.replace('\\"', '"').replace("\\'", "'")
-
-    # Remove stray leading/trailing quotes again (extra safety)
-    t = re.sub(r'(^"|"$)', '', t)
-    t = re.sub(r"(^'|'$)", '', t)
-
-    # Remove quotes around words but keep apostrophes inside words (Oyo's safe)
-    t = re.sub(r'\s+"([^"]+)"\s+', r' \1 ', t)
-    t = re.sub(r'\s+\'([^\']+)\'\s+', r' \1 ', t)
-
-    # Unescape HTML entities (&amp; -> & etc.)
     t = html.unescape(t)
-
-    # Remove leftover control chars
     t = re.sub(r'[\x00-\x1f\x7f]+', '', t)
-
     return t.strip()
 
 @app.route("/", methods=["GET"])
@@ -49,11 +30,9 @@ def handle():
         if not data:
             return jsonify({"error": "Invalid or empty JSON"}), 400
 
-        # CLEAN MODE — Make.com will send title here
+        # CLEAN MODE
         if 'title' in data:
             titles = data['title']
-
-            # If it's a string that might be JSON array, parse
             if isinstance(titles, str):
                 titles_str = titles.strip()
                 try:
@@ -69,15 +48,17 @@ def handle():
                     else:
                         titles = [titles_str]
 
-            # Clean each title
             if isinstance(titles, list):
                 cleaned = [clean_title(t) for t in titles if isinstance(t, str) and clean_title(t)]
             else:
                 cleaned = [clean_title(str(titles))] if titles else []
 
-            return jsonify({"titles": cleaned}), 200
+            # 🚀 Always return as plain string (no array, no quotes)
+            if cleaned:
+                return cleaned[0], 200
+            return "", 200
 
-        # GENERATE MODE — keyword given
+        # GENERATE MODE
         keyword = data.get("keyword", "").strip()
         if not keyword:
             return jsonify({"error": "Keyword is required when no title provided"}), 400
@@ -88,12 +69,10 @@ def handle():
             model="gpt-4",
             messages=[{"role": "user", "content": prompt}],
         )
-
         output = response.choices[0].message.content
         raw_titles = [line.strip("•-1234567890. ") for line in output.split("\n") if line.strip()]
         cleaned_titles = [clean_title(t) for t in raw_titles if t]
-
-        return jsonify({"titles": cleaned_titles}), 200
+        return "\n".join(cleaned_titles), 200
 
     except Exception as e:
         return jsonify({"error": "Server error", "details": str(e)}), 500
