@@ -1,4 +1,3 @@
-# main_safe.py
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from g4f.client import Client
@@ -54,7 +53,7 @@ def handle():
             logging.warning("⚠️ Empty or invalid JSON received.")
             return jsonify({"error": "Invalid or empty JSON"}), 400
 
-        # If titles are already provided, just clean and return them
+        # Titles provided directly? Clean & return
         if 'title' in data:
             titles = data['title']
             logging.info(f"📝 Raw titles from request: {titles}")
@@ -83,13 +82,14 @@ def handle():
             logging.info(f"✅ Cleaned titles: {cleaned}")
             return jsonify({"titles": cleaned}), 200
 
-        # GENERATE mode
+        # Keyword must be present for generation
         keyword = data.get("keyword", "").strip()
         if not keyword:
             logging.error("❌ Missing keyword for generation.")
             return jsonify({"error": "Keyword is required when no title provided"}), 400
 
         generate_content = data.get("generate_content", False)
+        logging.info(f"⚙️ generate_content flag is {generate_content}")
 
         client = Client()
 
