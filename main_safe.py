@@ -53,7 +53,7 @@ def handle():
             logging.warning("⚠️ Empty or invalid JSON received.")
             return jsonify({"error": "Invalid or empty JSON"}), 400
 
-        # Titles provided directly? Clean & return
+        # Titles cleaning mode
         if 'title' in data:
             titles = data['title']
             logging.info(f"📝 Raw titles from request: {titles}")
@@ -94,29 +94,41 @@ def handle():
         client = Client()
 
         if generate_content:
-            # Generate long detailed, well-formatted content
+            # Generate long detailed HTML content
             prompt = (
-                f"Write a long, detailed, SEO-friendly blog article on the topic: {keyword}. "
-                "Make it comprehensive, engaging, and well-structured for readers. "
-                "Use **bold main headings**, subheadings, bullet points, numbered lists, and "
-                "important words in **bold**. Add relevant emojis to make it lively. "
-                "Break text into short, readable paragraphs. "
-                "Include an introduction, multiple sections, and a conclusion. "
-                "Ensure formatting uses Markdown so that it can be easily pasted into Google Docs with styling preserved."
+                f"Write a long, SEO-friendly, detailed blog article on the topic: {keyword}.\n\n"
+                "Output must be clean HTML with these rules:\n"
+                "- <h1> for main title, <h2> for section headings, <h3> for subheadings.\n"
+                "- Use <b> for bold text, <i> for italic, and <u> for underline.\n"
+                "- Use <p> for paragraphs.\n"
+                "- Use <ul><li> for bullet points and <ol><li> for numbered lists.\n"
+                "- Insert relevant emojis inline.\n"
+                "- Keep formatting neat and consistent.\n"
+                "- Preserve all special characters and emojis without escaping.\n"
+                "- Do not include any Markdown, only pure HTML.\n"
+                "- Make sure HTML is valid and well-structured.\n"
             )
+            logging.info(f"🔍 Generating HTML content for keyword: {keyword}")
 
-            logging.info(f"🔍 Generating formatted long content for keyword: {keyword}")
             response = client.chat.completions.create(
                 model="gpt-4",
                 messages=[{"role": "user", "content": prompt}],
             )
-            content = response.choices[0].message.content
-            logging.info(f"🤖 Generated long content length: {len(content)} chars")
 
-            return jsonify({"content": content}), 200
+            content_html = response.choices[0].message.content
+
+            # Remove any accidental markdown code fences
+            content_html = re.sub(r'```html|```', '', content_html).strip()
+
+            logging.info(f"🤖 Generated HTML content length: {len(content_html)} chars")
+
+            return jsonify({
+                "content": content_html,
+                "format": "html"
+            }), 200
 
         else:
-            # Generate 5 unique blog titles
+            # Generate blog titles
             prompt = f"Give me 5 unique blog titles on the topic: {keyword}. Return only titles in list format, no intro or explanation."
             logging.info(f"🔍 Generating titles for keyword: {keyword}")
 
