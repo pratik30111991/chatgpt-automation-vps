@@ -94,12 +94,18 @@ def handle():
         client = Client()
 
         if generate_content:
-            # Generate long detailed content
+            # Generate long detailed, well-formatted content
             prompt = (
-                f"Write a long, detailed blog article on the topic: {keyword}. "
-                "Make it comprehensive and informative."
+                f"Write a long, detailed, SEO-friendly blog article on the topic: {keyword}. "
+                "Make it comprehensive, engaging, and well-structured for readers. "
+                "Use **bold main headings**, subheadings, bullet points, numbered lists, and "
+                "important words in **bold**. Add relevant emojis to make it lively. "
+                "Break text into short, readable paragraphs. "
+                "Include an introduction, multiple sections, and a conclusion. "
+                "Ensure formatting uses Markdown so that it can be easily pasted into Google Docs with styling preserved."
             )
-            logging.info(f"🔍 Generating long content for keyword: {keyword}")
+
+            logging.info(f"🔍 Generating formatted long content for keyword: {keyword}")
             response = client.chat.completions.create(
                 model="gpt-4",
                 messages=[{"role": "user", "content": prompt}],
