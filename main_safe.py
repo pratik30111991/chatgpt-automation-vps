@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from g4f.client import Client
-import re, json, html, logging, os
+import re, json, html, logging
 
 logging.basicConfig(
     level=logging.INFO,
@@ -152,5 +152,4 @@ def handle():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=10000)
