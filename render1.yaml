@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: chatgpt-automation-vps
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main_safe.py
-    plan: free
-    autoDeploy: true
