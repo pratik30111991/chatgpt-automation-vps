@@ -111,7 +111,7 @@ def handle():
             logging.info(f"🔍 Generating HTML content for keyword: {keyword}")
 
             response = client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-5-nano",
                 messages=[{"role": "user", "content": prompt}],
             )
 
@@ -133,7 +133,7 @@ def handle():
             logging.info(f"🔍 Generating titles for keyword: {keyword}")
 
             response = client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-5-nano",
                 messages=[{"role": "user", "content": prompt}],
             )
 
