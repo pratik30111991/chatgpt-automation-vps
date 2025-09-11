@@ -82,6 +82,8 @@ def pdf_titles():
         max_chars = int(data.get("max_chars", 12000))
         user_instruction = data.get("instruction")
 
+        logging.info(f"📥 INPUT (/pdf/titles): pdf_url={pdf_url}, max_chars={max_chars}, instruction={user_instruction}")
+
         pdf_text = extract_pdf_text(pdf_url)
         if not pdf_text:
             return jsonify({"error": "No text extracted from PDF"}), 400
@@ -106,7 +108,9 @@ def pdf_titles():
             if len(uniq) >= 5:
                 break
 
-        return jsonify({"titles": uniq}), 200
+        logging.info(f"📤 OUTPUT (/pdf/titles): {uniq}")
+
+        return jsonify({"titles": uniq, "fileSize": len(pdf_text)}), 200
 
     except Exception as e:
         logging.exception("Error in /pdf/titles")
@@ -131,6 +135,8 @@ def pdf_content():
         max_chars = int(data.get("max_chars", 20000))
         user_instruction = data.get("instruction")
 
+        logging.info(f"📥 INPUT (/pdf/content): pdf_url={pdf_url}, title={title}, max_chars={max_chars}, instruction={user_instruction}")
+
         pdf_text = extract_pdf_text(pdf_url)
         if not pdf_text:
             return jsonify({"error": "No text extracted from PDF"}), 400
@@ -146,6 +152,9 @@ def pdf_content():
         content_html = response.choices[0].message.content
         # Remove accidental code fences
         content_html = re.sub(r'```html|```', '', content_html).strip()
+
+        logging.info(f"📤 OUTPUT (/pdf/content): {len(content_html)} chars generated")
+
         return jsonify({"title": title, "content": content_html, "format": "html"}), 200
 
     except Exception as e:
