@@ -12,67 +12,57 @@ logging.basicConfig(
 app = Flask(__name__)
 CORS(app)
 
-# Helpers
-def extract_pdf_text(pdf_url: str) -> str:
-    """Download PDF and extract text (returns cleaned single-line text)."""
+# ----------------- Helpers -----------------
+def extract_pdf_text(pdf_url: str) -> tuple[str, dict]:
+    """Download PDF and extract text (returns cleaned text + page map)."""
     try:
         r = requests.get(pdf_url, stream=True, timeout=30)
         r.raise_for_status()
         pdf_file = io.BytesIO(r.content)
         reader = PdfReader(pdf_file)
+
         text_parts = []
-        for page in reader.pages:
+        page_map = {}  # {page_num: text}
+        for i, page in enumerate(reader.pages, start=1):
             try:
                 page_text = page.extract_text()
                 if page_text:
+                    page_text = re.sub(r'\s+', ' ', page_text).strip()
                     text_parts.append(page_text)
+                    page_map[i] = page_text
             except Exception:
                 continue
-        text = "\n".join(text_parts)
-        # Basic cleanup
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text
-    except Exception as e:
+
+        full_text = " ".join(text_parts)
+        return full_text, page_map
+    except Exception:
         logging.exception("PDF extraction error")
-        return ""
+        return "", {}
 
 def build_prompt_for_titles(pdf_text: str, user_instruction: str | None = None) -> str:
-    """Build prompt to ask model for titles. Keeps a minimal enforced constraint
-       that model must only use the PDF text."""
-    # Enforced minimal constraint to ensure model stays in-document
     enforced = "Use ONLY the text between the markers below to create blog titles. Do not use outside knowledge."
-    # Default instruction if user didn't provide custom
     default_instr = "Generate 5 unique, SEO-friendly blog titles specific to this document. Return only the titles, one per line."
     instruction = user_instruction.strip() if user_instruction else default_instr
-    prompt = f"{enforced}\n\n{instruction}\n\n--- PDF CONTENT START ---\n{pdf_text}\n--- PDF CONTENT END ---"
-    return prompt
+    return f"{enforced}\n\n{instruction}\n\n--- PDF CONTENT START ---\n{pdf_text}\n--- PDF CONTENT END ---"
 
 def build_prompt_for_content(pdf_text: str, title: str, user_instruction: str | None = None) -> str:
-    """Build prompt to ask model to write the article for a selected title using only PDF text."""
     enforced = "Use ONLY the text between the markers below to write the article. Do not use outside knowledge."
     default_instr = ("Write a long, SEO-friendly blog article for the given title. "
                      "Use only the PDF text. Respond in valid HTML using <h1>, <h2>, <p>, <ul>/<li> etc. "
                      "Do not include any Markdown. Return only the HTML.")
     instruction = user_instruction.strip() if user_instruction else default_instr
-    prompt = (
+    return (
         f"{enforced}\n\n{instruction}\n\nTitle: {title}\n\n"
         f"--- PDF CONTENT START ---\n{pdf_text}\n--- PDF CONTENT END ---"
     )
-    return prompt
 
-# Endpoints
+# ----------------- Endpoints -----------------
 @app.route("/", methods=["GET"])
 def home():
     return "✅ PDF + Dynamic Titles API running."
 
 @app.route("/pdf/titles", methods=["POST"])
 def pdf_titles():
-    """Extract PDF text and return 5 dynamic titles.
-       Optional JSON fields:
-         - pdf_url (required)
-         - instruction (optional): custom instruction for title generation
-         - max_chars (optional): how many chars of PDF to send (default 12000)
-    """
     try:
         data = request.get_json(force=True, silent=True) or {}
         pdf_url = data.get("pdf_url")
@@ -84,12 +74,11 @@ def pdf_titles():
 
         logging.info(f"📥 INPUT (/pdf/titles): pdf_url={pdf_url}, max_chars={max_chars}, instruction={user_instruction}")
 
-        pdf_text = extract_pdf_text(pdf_url)
+        pdf_text, page_map = extract_pdf_text(pdf_url)
         if not pdf_text:
             return jsonify({"error": "No text extracted from PDF"}), 400
 
         truncated = pdf_text[:max_chars]
-
         prompt = build_prompt_for_titles(truncated, user_instruction)
 
         client = Client()
@@ -98,17 +87,19 @@ def pdf_titles():
             messages=[{"role": "user", "content": prompt}],
         )
         raw = response.choices[0].message.content
-        # Clean into lines (basic)
+
+        # Clean into lines
         titles = [line.strip(" \t•-1234567890. ") for line in raw.splitlines() if line.strip()]
-        # Deduplicate & keep top 5
-        seen = set(); uniq = []
+        seen, uniq = set(), []
         for t in titles:
             if t.lower() not in seen:
                 seen.add(t.lower()); uniq.append(t)
             if len(uniq) >= 5:
                 break
 
-        logging.info(f"📤 OUTPUT (/pdf/titles): {uniq}")
+        # Logging ke liye pages ka info
+        logging.info(f"📤 OUTPUT (/pdf/titles): Titles={uniq}")
+        logging.info(f"📝 Pages Extracted: {list(page_map.keys())[:5]}... total={len(page_map)}")
 
         return jsonify({"titles": uniq, "fileSize": len(pdf_text)}), 200
 
@@ -118,13 +109,6 @@ def pdf_titles():
 
 @app.route("/pdf/content", methods=["POST"])
 def pdf_content():
-    """Generate article HTML for a selected title using only PDF text.
-       JSON fields:
-         - pdf_url (required)
-         - title (required)
-         - instruction (optional)
-         - max_chars (optional): default 20000
-    """
     try:
         data = request.get_json(force=True, silent=True) or {}
         pdf_url = data.get("pdf_url")
@@ -137,7 +121,7 @@ def pdf_content():
 
         logging.info(f"📥 INPUT (/pdf/content): pdf_url={pdf_url}, title={title}, max_chars={max_chars}, instruction={user_instruction}")
 
-        pdf_text = extract_pdf_text(pdf_url)
+        pdf_text, _ = extract_pdf_text(pdf_url)
         if not pdf_text:
             return jsonify({"error": "No text extracted from PDF"}), 400
 
@@ -150,7 +134,6 @@ def pdf_content():
             messages=[{"role": "user", "content": prompt}],
         )
         content_html = response.choices[0].message.content
-        # Remove accidental code fences
         content_html = re.sub(r'```html|```', '', content_html).strip()
 
         logging.info(f"📤 OUTPUT (/pdf/content): {len(content_html)} chars generated")
