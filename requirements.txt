@@ -1,5 +1,6 @@
 flask
 flask-cors
 requests
-g4f
 PyPDF2
+g4f
+typing_extensions
