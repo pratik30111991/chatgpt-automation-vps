@@ -76,8 +76,11 @@ def pdf_titles():
 
         pdf_text, page_map = extract_pdf_text(pdf_url)
         if not pdf_text:
-            logging.warning("⚠️ No text extracted from PDF – might be scanned/encoded.")
-            return jsonify({"error": "No text extracted from PDF"}), 400
+            return jsonify({
+                "error": "No text extracted – scanned or unsupported PDF",
+                "fileSize": 0,
+                "pages_checked": len(page_map)
+            }), 400
 
         truncated = pdf_text[:max_chars]
         prompt = build_prompt_for_titles(truncated, user_instruction)
@@ -87,35 +90,23 @@ def pdf_titles():
             model="gpt-5-nano",
             messages=[{"role": "user", "content": prompt}],
         )
-        raw = response.choices[0].message.content if response and response.choices else ""
+        raw = response.choices[0].message.content
 
         # Clean into lines
         titles = [line.strip(" \t•-1234567890. ") for line in raw.splitlines() if line.strip()]
         seen, uniq = set(), []
         for t in titles:
             if t.lower() not in seen:
-                seen.add(t.lower()); uniq.append(t)
+                seen.add(t.lower())
+                uniq.append(t)
             if len(uniq) >= 5:
                 break
 
-        if not uniq:
-            logging.warning("⚠️ AI returned no titles. Check PDF quality or prompt size.")
-            return jsonify({"error": "No titles generated from PDF"}), 400
+        # Logging ke liye page info
+        for i, t in enumerate(uniq, start=1):
+            logging.info(f"✅ Title {i}: \"{t}\" (source: PDF, total pages={len(page_map)})")
 
-        # Identify page numbers where titles appear
-        page_hits = {}
-        for title in uniq:
-            for pnum, text in page_map.items():
-                if title[:20].lower() in text.lower():  # match by substring
-                    page_hits[title] = pnum
-                    break
-
-        # Logging
-        for t in uniq:
-            page_info = f"(Page {page_hits[t]})" if t in page_hits else "(Page ?)"
-            logging.info(f"✅ Title found: {t} {page_info}")
-
-        logging.info(f"📝 Pages Extracted: {list(page_map.keys())[:5]}... total={len(page_map)}")
+        logging.info(f"📝 Extracted Pages={len(page_map)}, Characters={len(pdf_text)}")
 
         return jsonify({
             "titles": uniq,
@@ -141,10 +132,13 @@ def pdf_content():
 
         logging.info(f"📥 INPUT (/pdf/content): pdf_url={pdf_url}, title={title}, max_chars={max_chars}, instruction={user_instruction}")
 
-        pdf_text, _ = extract_pdf_text(pdf_url)
+        pdf_text, page_map = extract_pdf_text(pdf_url)
         if not pdf_text:
-            logging.warning("⚠️ No text extracted from PDF – might be scanned/encoded.")
-            return jsonify({"error": "No text extracted from PDF"}), 400
+            return jsonify({
+                "error": "No text extracted – scanned or unsupported PDF",
+                "fileSize": 0,
+                "pages_checked": len(page_map)
+            }), 400
 
         truncated = pdf_text[:max_chars]
         prompt = build_prompt_for_content(truncated, title, user_instruction)
@@ -154,12 +148,19 @@ def pdf_content():
             model="gpt-5-nano",
             messages=[{"role": "user", "content": prompt}],
         )
-        content_html = response.choices[0].message.content if response and response.choices else ""
+        content_html = response.choices[0].message.content
         content_html = re.sub(r'```html|```', '', content_html).strip()
 
         logging.info(f"📤 OUTPUT (/pdf/content): {len(content_html)} chars generated")
+        logging.info(f"📝 Extracted Pages={len(page_map)}, Characters={len(pdf_text)}")
 
-        return jsonify({"title": title, "content": content_html, "format": "html"}), 200
+        return jsonify({
+            "title": title,
+            "content": content_html,
+            "format": "html",
+            "fileSize": len(pdf_text),
+            "pages_checked": len(page_map)
+        }), 200
 
     except Exception as e:
         logging.exception("Error in /pdf/content")
